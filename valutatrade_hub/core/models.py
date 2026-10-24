@@ -168,14 +168,19 @@ class User:
 
 
 class Portfolio:
-    def __init__(self, user_id: int, wallets: dict[str, Wallet]) -> None:
-        self._user_id = user_id
+    def __init__(self, user: User, wallets: dict[str, Wallet]) -> None:
+        self._user = user
         self._wallets = wallets
 
     @property
     def user_id(self) -> int:
         """Получить user_id."""
-        return self._user_id
+        return self._user.user_id
+
+    @property
+    def user(self) -> User:
+        """Получить владельца портфеля."""
+        return self._user
 
     @property
     def wallets(self) -> dict[str, Wallet]:

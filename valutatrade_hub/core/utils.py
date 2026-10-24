@@ -2,35 +2,34 @@ import json
 import os
 
 
-def load_users(users_path: str) -> list[dict]:
+def load_json(path: str) -> list[dict]:
     """
     Читает JSON файл и возвращает список словарей
 
-    :param users_path: путь до JSON-файла users
-    :return: список словарей с пользователями или пустой список если файла нет
+    :param path: путь до JSON-файла
+    :return: список словарей
     """
     try:
-        with open(users_path, encoding="UTF-8") as file:
-            users = json.load(file)
+        with open(path, encoding="UTF-8") as file:
+            result = json.load(file)
     except FileNotFoundError:
-        users = []
+        result = []
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON format in file.")
 
-    return users
+    return result
 
 
-def save_users(users_path: str, users: list[dict]) -> None:
+def save_json(path: str, data: list[dict]) -> None:
     """
-    Сохраняет список пользователей в JSON-файл
+    Сохраняет список data в JSON-файл
 
-    :param users_path: путь до JSON-файла users
-    :param users: список с пользователями
-    :return: None
+    :param path: путь до JSON-файл
+    :param data: список словарей для сохранения
     """
-    directory = os.path.dirname(users_path)
+    directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
 
-    with open(users_path, "w", encoding="UTF-8") as file:
-        json.dump(users, file, ensure_ascii=False, indent=4)
+    with open(path, "w", encoding="UTF-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=4)
