@@ -88,13 +88,13 @@ def login(username: str, password: str) -> User:
     return user_obj
 
 
-def get_cached_rate(from_currency: str, to_currency: str) -> float:
+def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     """
     Возвращает курс из кеша, обновляя отсутствующие или устаревшие записи
 
     :param from_currency: код исходной валюты
     :param to_currency: код целевой валюты
-    :return: количество единиц целевой валюты за одну единицу исходной
+    :return: словарь с курсом и временем его обновления
     :raises TypeError: если код валюты не является строкой
     :raises ValueError: если код пустой, курс неизвестен или кеш некорректен
     """
@@ -117,10 +117,10 @@ def get_cached_rate(from_currency: str, to_currency: str) -> float:
         age = datetime.now() - updated_at
 
         if age < timedelta(minutes=5):
-            return cache["rate"]
+            return cache
 
     rate = get_rate(from_currency, to_currency)
     rates[currency_pair] = {"rate": rate, "updated_at": datetime.now().isoformat()}
     save_json(RATES_PATH, rates)
 
-    return rate
+    return rates[currency_pair]
