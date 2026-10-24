@@ -159,3 +159,17 @@ def get_rate(from_currency: str, to_currency: str) -> float:
         raise ValueError(f'Неизвестный код валюты: "{to_currency}"')
 
     return EXCHANGE_RATES[from_currency] / EXCHANGE_RATES[to_currency]
+
+
+def validate_amount(amount: float) -> None:
+    """Валидирует сумму"""
+    if isinstance(amount, bool):
+        raise TypeError(
+            f"amount must be int or float, but got {type(amount).__name__}."
+        )
+
+    if not isinstance(amount, int | float):
+        raise TypeError(f"amount must be int or float, but got {type(amount).__name__}")
+
+    if amount <= 0:
+        raise ValueError("Сумма не может быть отрицательной или равной 0")

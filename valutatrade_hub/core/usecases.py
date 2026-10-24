@@ -11,6 +11,7 @@ from valutatrade_hub.core.utils import (
     save_json,
     user_from_dict,
     user_to_dict,
+    validate_amount,
     validate_currency_code,
 )
 
@@ -185,20 +186,10 @@ def buy(user: User, currency_code: str, amount: float) -> None:
         raise TypeError(f"user must be User, but got {type(user).__name__}")
 
     currency_code = validate_currency_code(currency_code)
+    validate_amount(amount)
 
     if currency_code == "USD":
         raise ValueError("Нельзя купить USD за USD.")
-
-    if isinstance(amount, bool):
-        raise TypeError(
-            f"amount must be int or float, but got {type(amount).__name__}."
-        )
-
-    if not isinstance(amount, int | float):
-        raise TypeError(f"amount must be int or float, but got {type(amount).__name__}")
-
-    if amount <= 0:
-        raise ValueError("Сумма не может быть отрицательной или равной 0")
 
     portfolio = get_portfolio(user)
     wallets = portfolio.wallets
@@ -220,5 +211,48 @@ def buy(user: User, currency_code: str, amount: float) -> None:
     target_wallet = portfolio.get_wallet(currency_code)
     usd_wallet.withdraw(price)
     target_wallet.deposit(amount)
+
+    save_portfolio(portfolio)
+
+
+def sell(user: User, currency_code: str, amount: float) -> None:
+    """
+    Продаёт валюту с зачислением выручки в USD-кошелёк
+
+    :param user: пользователь, совершающий продажу
+    :param currency_code: код продаваемой валюты
+    :param amount: количество продаваемой валюты
+    :raises TypeError: если пользователь, код валюты или сумма имеют неверный тип
+    :raises ValueError: если сумма неположительная, валюта недопустима,
+        кошелёк отсутствует, средств недостаточно или данные хранилища некорректны
+    """
+    if not isinstance(user, User):
+        raise TypeError(f"user must be User, but got {type(user).__name__}")
+
+    currency_code = validate_currency_code(currency_code)
+    validate_amount(amount)
+
+    if currency_code == "USD":
+        raise ValueError("Нельзя продать USD за USD.")
+
+    portfolio = get_portfolio(user)
+    wallets = portfolio.wallets
+
+    if currency_code not in wallets:
+        raise ValueError(f'Кошелёк "{currency_code}" не существует')
+
+    sell_wallet = wallets[currency_code]
+    if sell_wallet.balance < amount:
+        raise ValueError(f'Недостаточно средств в "{currency_code}"')
+
+    cached_data = get_cached_rate(currency_code, "USD")
+    revenue = amount * cached_data["rate"]
+
+    if "USD" not in wallets:
+        portfolio.add_currency("USD")
+
+    usd_wallet = portfolio.get_wallet("USD")
+    sell_wallet.withdraw(amount)
+    usd_wallet.deposit(revenue)
 
     save_portfolio(portfolio)
