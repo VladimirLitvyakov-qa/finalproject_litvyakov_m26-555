@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from valutatrade_hub.core.models import User
+from valutatrade_hub.core.models import Portfolio, User, Wallet
 
 
 def load_json(path: str) -> list[dict]:
@@ -80,3 +80,48 @@ def user_to_dict(user: User) -> dict:
         "salt": salt,
         "registration_date": registration_date,
     }
+
+
+def portfolio_to_dict(portfolio: Portfolio) -> dict:
+    """
+    Преобразовывает из объекта портфеля в словарь
+
+    :param portfolio: объект Portfolio
+    :return: словарь с портфелем пользователя
+    """
+    if not isinstance(portfolio, Portfolio):
+        raise TypeError(
+            f"portfolio must be Portfolio, but got {type(portfolio).__name__}"
+        )
+
+    user_id = portfolio.user_id
+    wallets = {}
+
+    for code, wallet in portfolio.wallets.items():
+        wallets[code] = {"balance": wallet.balance}
+
+    return {"user_id": user_id, "wallets": wallets}
+
+
+def portfolio_from_dict(data: dict, user: User) -> Portfolio:
+    """
+    Создает портфель пользователя из словаря
+
+    :param data: словарь
+    :param user: объект User
+    :return: объект Portfolio
+    """
+    if not isinstance(data, dict):
+        raise TypeError(f"data must be dict, but got {type(data).__name__}")
+
+    if not isinstance(user, User):
+        raise TypeError(f"user must be User, but got {type(user).__name__}")
+
+    if data["user_id"] != user.user_id:
+        raise ValueError("Портфель принадлежит другому пользователю")
+
+    wallets = {}
+    for code, wallet in data["wallets"].items():
+        wallets[code] = Wallet(code, wallet["balance"])
+
+    return Portfolio(user, wallets)
