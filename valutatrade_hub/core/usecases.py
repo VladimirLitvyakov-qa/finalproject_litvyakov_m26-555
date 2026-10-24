@@ -7,6 +7,7 @@ from valutatrade_hub.core.utils import (
     load_json,
     portfolio_to_dict,
     save_json,
+    user_from_dict,
     user_to_dict,
 )
 
@@ -52,3 +53,23 @@ def register(username: str, password: str) -> User:
     save_json(PORTFOLIOS_PATH, portfolios)
 
     return new_user
+
+
+def login(username: str, password: str) -> User:
+    """Авторизует пользователя в системе"""
+    users = load_json(USERS_PATH)
+
+    for user in users:
+        if user["username"] == username:
+            user_obj = user_from_dict(user)
+            break
+    else:
+        raise ValueError(
+            f'Пользователь с именем: "{username}" не найден в системе. '
+            f'Попробуйте снова.'
+        )
+
+    if not user_obj.verify_password(password):
+        raise ValueError("Неверный пароль")
+
+    return user_obj
