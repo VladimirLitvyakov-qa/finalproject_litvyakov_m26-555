@@ -146,3 +146,25 @@ def get_portfolio(user: User) -> Portfolio:
             return portfolio_from_dict(portfolio, user)
     else:
         raise ValueError("Портфель пользователя не найден")
+
+
+def save_portfolio(portfolio: Portfolio) -> None:
+    """
+    Сохраняет портфель пользователя
+
+    :param portfolio: объект Portfolio
+    :raises ValueError: данные не являются списком или
+        портфель пользователя не найден
+    """
+    portfolios = load_json(PORTFOLIOS_PATH, [])
+
+    if not isinstance(portfolios, list):
+        raise ValueError("Файл портфелей должен содержать список.")
+
+    for i, data in enumerate(portfolios):
+        if data["user_id"] == portfolio.user_id:
+            portfolios[i] = portfolio_to_dict(portfolio)
+            save_json(PORTFOLIOS_PATH, portfolios)
+            break
+    else:
+        raise ValueError("Портфель пользователя не найден")
