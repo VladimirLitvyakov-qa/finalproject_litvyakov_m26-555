@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-from valutatrade_hub.core.models import Portfolio, User, Wallet
+from valutatrade_hub.core.models import Portfolio, User, Wallet, EXCHANGE_RATES
 
 
 def load_json(path: str) -> list[dict]:
@@ -125,3 +125,29 @@ def portfolio_from_dict(data: dict, user: User) -> Portfolio:
         wallets[code] = Wallet(code, wallet["balance"])
 
     return Portfolio(user, wallets)
+
+
+def get_rate(from_currency: str, to_currency: str) -> float:
+    """Получить расчет по целевой валюте"""
+    if not isinstance(from_currency, str):
+        raise TypeError(f"from_currency must be str, but got {type(from_currency).__name__}")
+
+    if not isinstance(to_currency, str):
+        raise TypeError(f"to_currency must be str, but got {type(to_currency).__name__}")
+
+    if not from_currency:
+        raise ValueError("Исходная валюта не может быть пустым.")
+
+    if not to_currency:
+        raise ValueError("Целевая валюта не может быть пустой.")
+
+    from_currency = from_currency.upper()
+    to_currency = to_currency.upper()
+
+    if from_currency not in EXCHANGE_RATES:
+        raise ValueError(f'Неизвестный код валюты: "{from_currency}"')
+
+    if to_currency not in EXCHANGE_RATES:
+        raise ValueError(f'Неизвестный код валюты: "{to_currency}"')
+
+    return EXCHANGE_RATES[from_currency] / EXCHANGE_RATES[to_currency]
