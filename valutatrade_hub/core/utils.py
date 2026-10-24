@@ -2,33 +2,35 @@ import json
 import os
 from datetime import datetime
 
-from valutatrade_hub.core.models import Portfolio, User, Wallet, EXCHANGE_RATES
+from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
 
 
-def load_json(path: str) -> list[dict]:
+def load_json(path: str, default: list | dict) -> list | dict:
     """
     Читает JSON файл и возвращает список словарей
 
     :param path: путь до JSON-файла
+    :param default: значение, возвращаемое при отсутствии файла
     :return: список словарей
+    :raises ValueError: если файл содержит некорректный JSON
     """
     try:
         with open(path, encoding="UTF-8") as file:
             result = json.load(file)
     except FileNotFoundError:
-        result = []
+        result = default
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON format in file.")
 
     return result
 
 
-def save_json(path: str, data: list[dict]) -> None:
+def save_json(path: str, data: list | dict) -> None:
     """
-    Сохраняет список data в JSON-файл
+    Сохраняет данные в JSON-файл
 
-    :param path: путь до JSON-файл
-    :param data: список словарей для сохранения
+    :param path: путь до JSON-файла
+    :param data: список или словарь для сохранения
     """
     directory = os.path.dirname(path)
     if directory:
@@ -127,22 +129,28 @@ def portfolio_from_dict(data: dict, user: User) -> Portfolio:
     return Portfolio(user, wallets)
 
 
+def validate_currency_code(currency_code: str) -> str:
+    """
+    Валидирует код валюты
+
+    :param currency_code: код валюты
+    :return: код валюты в верхнем регистре
+    """
+    if not isinstance(currency_code, str):
+        raise TypeError(
+            f"currency_code must be str, but got {type(currency_code).__name__}"
+        )
+
+    if not currency_code:
+        raise ValueError("Код валюты не может быть пустой.")
+
+    return currency_code.upper()
+
+
 def get_rate(from_currency: str, to_currency: str) -> float:
     """Получить расчет по целевой валюте"""
-    if not isinstance(from_currency, str):
-        raise TypeError(f"from_currency must be str, but got {type(from_currency).__name__}")
-
-    if not isinstance(to_currency, str):
-        raise TypeError(f"to_currency must be str, but got {type(to_currency).__name__}")
-
-    if not from_currency:
-        raise ValueError("Исходная валюта не может быть пустым.")
-
-    if not to_currency:
-        raise ValueError("Целевая валюта не может быть пустой.")
-
-    from_currency = from_currency.upper()
-    to_currency = to_currency.upper()
+    from_currency = validate_currency_code(from_currency)
+    to_currency = validate_currency_code(to_currency)
 
     if from_currency not in EXCHANGE_RATES:
         raise ValueError(f'Неизвестный код валюты: "{from_currency}"')
