@@ -1,6 +1,14 @@
 import hashlib
 from datetime import datetime
 
+EXCHANGE_RATES = {
+    "USD": 1.0,
+    "EUR": 1.1,
+    "RUB": 0.01,
+    "BTC": 60000.0,
+    "ETH": 3000.0,
+}
+
 
 class Wallet:
     def __init__(self, currency_code: str, balance: float = 0.0) -> None:
@@ -157,3 +165,72 @@ class User:
         password_hash = hashlib.sha256(password_bytes).hexdigest()
 
         return password_hash == self.hashed_password
+
+
+class Portfolio:
+    def __init__(self, user_id: int, wallets: dict[str, Wallet]) -> None:
+        self._user_id = user_id
+        self._wallets = wallets
+
+    @property
+    def user_id(self) -> int:
+        """Получить user_id."""
+        return self._user_id
+
+    @property
+    def wallets(self) -> dict[str, Wallet]:
+        """Получить портфель кошельков."""
+        return self._wallets.copy()
+
+    def add_currency(self, currency_code: str) -> None:
+        """Добавляет новый кошелек в портфель."""
+        if not isinstance(currency_code, str):
+            raise TypeError(
+                f"currency_code must be str, but got {type(currency_code).__name__}"
+            )
+
+        if not currency_code:
+            raise ValueError("Код валюты не может быть пустым.")
+
+        currency_code = currency_code.upper()
+
+        if currency_code in self.wallets:
+            raise ValueError("Данная валюта уже есть в кошельке")
+
+        self._wallets[currency_code] = Wallet(currency_code)
+
+    def get_wallet(self, currency_code: str) -> Wallet:
+        """Получить кошелек по коду валюты."""
+        if not isinstance(currency_code, str):
+            raise TypeError(
+                f"currency_code must be str, but got {type(currency_code).__name__}"
+            )
+
+        if not currency_code:
+            raise ValueError("Код валюты не может быть пустым.")
+
+        currency_code = currency_code.upper()
+
+        return self.wallets[currency_code]
+
+    def get_total_value(self, base_currency: str = "USD") -> float:
+        """Получить сумму всего баланса в указанной валюте"""
+        if not isinstance(base_currency, str):
+            raise TypeError(
+                f"base_currency must be str, but got {type(base_currency).__name__}"
+            )
+
+        if not base_currency:
+            raise ValueError("Код валюты не может быть пустым.")
+
+        base_currency = base_currency.upper()
+
+        if base_currency not in EXCHANGE_RATES:
+            raise ValueError("Неизвестная валюта.")
+
+        wallet_values_usd = []
+        for code, wallet in self._wallets.items():
+            value = wallet.balance * EXCHANGE_RATES[code]
+            wallet_values_usd.append(value)
+
+        return sum(wallet_values_usd) / EXCHANGE_RATES[base_currency]
