@@ -6,6 +6,7 @@ from valutatrade_hub.core.models import Portfolio, User
 from valutatrade_hub.core.utils import (
     get_rate,
     load_json,
+    portfolio_from_dict,
     portfolio_to_dict,
     save_json,
     user_from_dict,
@@ -124,3 +125,24 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     save_json(RATES_PATH, rates)
 
     return rates[currency_pair]
+
+
+def get_portfolio(user: User) -> Portfolio:
+    """
+    Загружает портфель пользователя
+
+    :param user: владелец портфеля
+    :return: объект Portfolio
+    :raises ValueError: если JSON некорректен, данные не являются списком
+        или портфель пользователя не найден
+    """
+    portfolios = load_json(PORTFOLIOS_PATH, [])
+
+    if not isinstance(portfolios, list):
+        raise ValueError("Файл портфелей должен содержать список.")
+
+    for portfolio in portfolios:
+        if portfolio["user_id"] == user.user_id:
+            return portfolio_from_dict(portfolio, user)
+    else:
+        raise ValueError("Портфель пользователя не найден")
