@@ -1,6 +1,10 @@
 import shlex
 
-from valutatrade_hub.core.usecases import login, register
+from valutatrade_hub.core.usecases import (
+    get_portfolio_summary,
+    login,
+    register,
+)
 
 
 def main():
@@ -49,7 +53,51 @@ def main():
 
                 print(f"Вы вошли как '{current_user.username}'")
             case "show-portfolio":
-                ...
+                if len(args) not in (1, 3):
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+
+                if len(args) == 3 and args[1] != "--base":
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+
+                if current_user is None:
+                    print("Сначала выполните login.")
+                    continue
+
+                if len(args) == 1:
+                    base_currency = "USD"
+                else:
+                    base_currency = args[2]
+
+                try:
+                    portfolio = get_portfolio_summary(current_user, base_currency)
+                except ValueError as e:
+                    print(e)
+                    continue
+
+                wallets = portfolio["wallets"]
+                if not wallets:
+                    print("В портфеле пока нет кошельков.")
+                    continue
+
+                username = current_user.username
+                print(f"Портфель пользователя '{username}' (база: {base_currency}):")
+
+                base_precision = 8 if base_currency in ("BTC", "ETH") else 2
+                for wallet in wallets:
+                    code = wallet["currency_code"]
+                    balance = wallet["balance"]
+                    value = wallet["value"]
+                    balance_precision = 8 if code in ("BTC", "ETH") else 2
+
+                    print(
+                        f"- {code}: {balance:.{balance_precision}f} → "
+                        f"{value:.{base_precision}f} {base_currency}"
+                    )
+
+                print("-" * 33)
+                print(f"ИТОГО: {portfolio['total']:.{base_precision}f} {base_currency}")
             case "exit":
                 break
             case _:

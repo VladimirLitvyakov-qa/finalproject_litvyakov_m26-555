@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from valutatrade_hub.core.models import Portfolio, User
+from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User
 from valutatrade_hub.core.utils import (
     get_rate,
     load_json,
@@ -169,6 +169,40 @@ def save_portfolio(portfolio: Portfolio) -> None:
             break
     else:
         raise ValueError("Портфель пользователя не найден")
+
+
+def get_portfolio_summary(user: User, base_currency: str = "USD") -> dict:
+    """
+    Подготавливает сводку портфеля пользователя в базовой валюте
+
+    :param user: владелец портфеля
+    :param base_currency: базовая валюта для расчёта стоимости
+    :return: словарь с данными кошельков, общей стоимостью и базовой валютой
+    :raises TypeError: если пользователь или код валюты имеют неверный тип
+    :raises ValueError: если валюта пустая или неизвестна, портфель не найден
+        или данные хранилища некорректны
+    """
+    if not isinstance(user, User):
+        raise TypeError(f"user must be User, but got {type(user).__name__}")
+
+    base_currency = validate_currency_code(base_currency)
+    portfolio = get_portfolio(user)
+
+    if base_currency not in EXCHANGE_RATES:
+        raise ValueError("Неизвестная валюта.")
+
+    wallet_details = []
+    total = 0.0
+
+    for code, wallet in portfolio.wallets.items():
+        rate = get_cached_rate(code, base_currency)["rate"]
+        value = rate * wallet.balance
+        result = {"currency_code": code, "balance": wallet.balance, "value": value}
+        wallet_details.append(result)
+        total += value
+
+    result = {"wallets": wallet_details, "total": total, "base_currency": base_currency}
+    return result
 
 
 def buy(user: User, currency_code: str, amount: float) -> None:
