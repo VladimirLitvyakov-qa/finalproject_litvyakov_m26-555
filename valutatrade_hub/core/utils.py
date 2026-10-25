@@ -172,4 +172,4 @@ def validate_amount(amount: float) -> None:
         raise TypeError(f"amount must be int or float, but got {type(amount).__name__}")
 
     if amount <= 0:
-        raise ValueError("Сумма не может быть отрицательной или равной 0")
+        raise ValueError("'amount' должен быть положительным числом")

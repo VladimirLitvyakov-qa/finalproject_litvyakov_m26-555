@@ -189,7 +189,7 @@ def get_portfolio_summary(user: User, base_currency: str = "USD") -> dict:
     portfolio = get_portfolio(user)
 
     if base_currency not in EXCHANGE_RATES:
-        raise ValueError("Неизвестная валюта.")
+        raise ValueError(f"Неизвестная базовая валюта '{base_currency}'")
 
     wallet_details = []
     total = 0.0
@@ -205,13 +205,15 @@ def get_portfolio_summary(user: User, base_currency: str = "USD") -> dict:
     return result
 
 
-def buy(user: User, currency_code: str, amount: float) -> None:
+def buy(user: User, currency_code: str, amount: float) -> dict:
     """
     Покупает валюту за средства USD-кошелька
 
     :param user: пользователь, совершающий покупку
     :param currency_code: код покупаемой валюты
     :param amount: количество покупаемой валюты
+    :return: словарь с кодом и количеством валюты, балансами до и после покупки,
+        использованным курсом и стоимостью покупки в USD
     :raises TypeError: если пользователь, код валюты или сумма имеют неверный тип
     :raises ValueError: если сумма неположительная, валюта недопустима,
         недостаточно USD или данные хранилища некорректны
@@ -228,7 +230,11 @@ def buy(user: User, currency_code: str, amount: float) -> None:
     portfolio = get_portfolio(user)
     wallets = portfolio.wallets
 
-    cached_data = get_cached_rate(currency_code, "USD")
+    try:
+        cached_data = get_cached_rate(currency_code, "USD")
+    except ValueError:
+        raise ValueError(f"Не удалось получить курс для {currency_code}→USD")
+
     price = amount * cached_data["rate"]
 
     if "USD" not in wallets:
@@ -244,9 +250,22 @@ def buy(user: User, currency_code: str, amount: float) -> None:
 
     target_wallet = portfolio.get_wallet(currency_code)
     usd_wallet.withdraw(price)
+    balance_before = target_wallet.balance
     target_wallet.deposit(amount)
+    balance_after = target_wallet.balance
 
     save_portfolio(portfolio)
+
+    result = {
+        "currency_code": currency_code,
+        "amount": amount,
+        "balance_before": balance_before,
+        "balance_after": balance_after,
+        "rate": cached_data["rate"],
+        "price": price,
+    }
+
+    return result
 
 
 def sell(user: User, currency_code: str, amount: float) -> None:
