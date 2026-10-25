@@ -15,12 +15,14 @@ from valutatrade_hub.core.usecases import (
     register,
     sell,
 )
+from valutatrade_hub.infra.settings import SettingsLoader
 from valutatrade_hub.logging_config import setup_logging
 
 
 def main():
     current_user = None
 
+    settings = SettingsLoader()
     setup_logging()
     while True:
         user_input = input("Введите команду: ")
@@ -84,7 +86,7 @@ def main():
                     continue
 
                 if len(args) == 1:
-                    base_currency = "USD"
+                    base_currency = settings.get("default_base_currency")
                 else:
                     base_currency = args[2].upper()
 

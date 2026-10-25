@@ -5,7 +5,7 @@ from inspect import signature
 
 def log_action(verbose: bool = False):
     """
-    Логирует успешные и неуспешные торговые операции.
+    Логирует успешные и неуспешные торговые операции
 
     :param verbose: добавлять баланс до и после операции
     """
