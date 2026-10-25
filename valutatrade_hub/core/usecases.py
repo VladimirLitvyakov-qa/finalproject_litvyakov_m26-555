@@ -2,7 +2,9 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User
+from valutatrade_hub.core.currencies import get_currency
+from valutatrade_hub.core.exceptions import ApiRequestError, InsufficientFundsError
+from valutatrade_hub.core.models import Portfolio, User
 from valutatrade_hub.core.utils import (
     get_rate,
     portfolio_from_dict,
@@ -10,17 +12,12 @@ from valutatrade_hub.core.utils import (
     user_from_dict,
     user_to_dict,
     validate_amount,
-    validate_currency_code,
 )
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 
 db = DatabaseManager()
 settings = SettingsLoader()
-
-
-class RateUnavailableError(Exception):
-    """Не удалось получить курс из источника."""
 
 
 def register(username: str, password: str) -> User:
@@ -89,10 +86,12 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     :param to_currency: код целевой валюты
     :return: словарь с курсом и временем его обновления
     :raises TypeError: если код валюты не является строкой
-    :raises ValueError: если код пустой, курс неизвестен или кеш некорректен
+    :raises ValueError: если код пустой или данные кеша некорректны
+    :raises CurrencyNotFoundError: если код валюты неизвестен
+    :raises ApiRequestError: если произошёл сбой при обращении к источнику курсов
     """
-    from_currency = validate_currency_code(from_currency)
-    to_currency = validate_currency_code(to_currency)
+    from_currency = get_currency(from_currency).code
+    to_currency = get_currency(to_currency).code
     currency_pair = from_currency + "_" + to_currency
 
     rates = db.load_rates()
@@ -112,9 +111,8 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     try:
         rate = get_rate(from_currency, to_currency)
     except (ConnectionError, TimeoutError) as error:
-        raise RateUnavailableError(
-            f"Курс {from_currency}→{to_currency} недоступен. Повторите попытку позже."
-        ) from error
+        raise ApiRequestError(str(error)) from error
+
     rates[currency_pair] = {"rate": rate, "updated_at": datetime.now().isoformat()}
     db.save_rates(rates)
 
@@ -166,17 +164,16 @@ def get_portfolio_summary(user: User, base_currency: str = "USD") -> dict:
     :param base_currency: базовая валюта для расчёта стоимости
     :return: словарь с данными кошельков, общей стоимостью и базовой валютой
     :raises TypeError: если пользователь или код валюты имеют неверный тип
-    :raises ValueError: если валюта пустая или неизвестна, портфель не найден
+    :raises ValueError: если код пустой, портфель не найден
         или данные хранилища некорректны
+    :raises CurrencyNotFoundError: если код валюты неизвестен
+    :raises ApiRequestError: если произошёл сбой при обращении к источнику курсов
     """
     if not isinstance(user, User):
         raise TypeError(f"user must be User, but got {type(user).__name__}")
 
-    base_currency = validate_currency_code(base_currency)
+    base_currency = get_currency(base_currency).code
     portfolio = get_portfolio(user)
-
-    if base_currency not in EXCHANGE_RATES:
-        raise ValueError(f"Неизвестная базовая валюта '{base_currency}'")
 
     wallet_details = []
     total = 0.0
@@ -202,13 +199,16 @@ def buy(user: User, currency_code: str, amount: float) -> dict:
     :return: словарь с кодом и количеством валюты, балансами до и после покупки,
         использованным курсом и стоимостью покупки в USD
     :raises TypeError: если пользователь, код валюты или сумма имеют неверный тип
-    :raises ValueError: если сумма неположительная, валюта недопустима,
-        недостаточно USD или данные хранилища некорректны
+    :raises ValueError: если сумма недопустима, запрошена покупка USD за USD,
+        данные хранилища некорректны
+    :raises InsufficientFundsError: если недостаточно средств в USD
+    :raises CurrencyNotFoundError: если код валюты неизвестен
+    :raises ApiRequestError: если произошёл сбой при обращении к источнику курсов
     """
     if not isinstance(user, User):
         raise TypeError(f"user must be User, but got {type(user).__name__}")
 
-    currency_code = validate_currency_code(currency_code)
+    currency_code = get_currency(currency_code).code
     validate_amount(amount)
 
     if currency_code == "USD":
@@ -216,21 +216,16 @@ def buy(user: User, currency_code: str, amount: float) -> dict:
 
     portfolio = get_portfolio(user)
     wallets = portfolio.wallets
-
-    try:
-        cached_data = get_cached_rate(currency_code, "USD")
-    except (ValueError, RateUnavailableError):
-        raise ValueError(f"Не удалось получить курс для {currency_code}→USD")
-
+    cached_data = get_cached_rate(currency_code, "USD")
     price = amount * cached_data["rate"]
 
     if "USD" not in wallets:
-        raise ValueError("Недостаточно средств в USD.")
+        raise InsufficientFundsError(0, price, "USD")
 
     usd_wallet = wallets["USD"]
 
     if usd_wallet.balance < price:
-        raise ValueError("Недостаточно средств в USD.")
+        raise InsufficientFundsError(usd_wallet.balance, price, "USD")
 
     if currency_code not in wallets:
         portfolio.add_currency(currency_code)
@@ -265,13 +260,16 @@ def sell(user: User, currency_code: str, amount: float) -> dict:
     :return: словарь с кодом и количеством валюты, балансами до и после продажи,
         использованным курсом и оценочной выручкой в USD
     :raises TypeError: если пользователь, код валюты или сумма имеют неверный тип
-    :raises ValueError: если сумма неположительная, валюта недопустима,
-        кошелёк отсутствует, средств недостаточно или данные хранилища некорректны
+    :raises ValueError: если сумма недопустима, запрошена продажа USD за USD,
+        кошелёк отсутствует или данные хранилища некорректны
+    :raises InsufficientFundsError: если недостаточно продаваемой валюты
+    :raises CurrencyNotFoundError: если код валюты неизвестен
+    :raises ApiRequestError: если произошёл сбой при обращении к источнику курсов
     """
     if not isinstance(user, User):
         raise TypeError(f"user must be User, but got {type(user).__name__}")
 
-    currency_code = validate_currency_code(currency_code)
+    currency_code = get_currency(currency_code).code
     validate_amount(amount)
 
     if currency_code == "USD":
@@ -287,12 +285,9 @@ def sell(user: User, currency_code: str, amount: float) -> dict:
         )
 
     sell_wallet = wallets[currency_code]
-    if sell_wallet.balance < amount:
-        raise ValueError(
-            f"Недостаточно средств: "
-            f"доступно {sell_wallet.balance} {currency_code}, "
-            f"требуется {amount} {currency_code}"
-        )
+    balance = sell_wallet.balance
+    if balance < amount:
+        raise InsufficientFundsError(balance, amount, currency_code)
 
     cached_data = get_cached_rate(currency_code, "USD")
     revenue = amount * cached_data["rate"]
@@ -301,7 +296,6 @@ def sell(user: User, currency_code: str, amount: float) -> dict:
         portfolio.add_currency("USD")
 
     usd_wallet = portfolio.get_wallet("USD")
-    balance_before = sell_wallet.balance
     sell_wallet.withdraw(amount)
     balance_after = sell_wallet.balance
     usd_wallet.deposit(revenue)
@@ -311,7 +305,7 @@ def sell(user: User, currency_code: str, amount: float) -> dict:
     result = {
         "currency_code": currency_code,
         "amount": amount,
-        "balance_before": balance_before,
+        "balance_before": balance,
         "balance_after": balance_after,
         "rate": cached_data["rate"],
         "revenue": revenue,

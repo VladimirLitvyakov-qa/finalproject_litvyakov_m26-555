@@ -1,8 +1,13 @@
 import shlex
 from datetime import datetime
 
+from valutatrade_hub.core.currencies import CURRENCIES
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.usecases import (
-    RateUnavailableError,
     buy,
     get_cached_rate,
     get_portfolio_summary,
@@ -83,7 +88,15 @@ def main():
 
                 try:
                     portfolio = get_portfolio_summary(current_user, base_currency)
-                except (ValueError, RateUnavailableError) as e:
+                except ApiRequestError as e:
+                    print(e)
+                    print("Повторите попытку позже или проверьте подключение к сети.")
+                    continue
+                except CurrencyNotFoundError as e:
+                    print(e)
+                    print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                    continue
+                except ValueError as e:
                     print(e)
                     continue
 
@@ -130,6 +143,19 @@ def main():
                 if args[0] == "buy":
                     try:
                         buy_info = buy(current_user, current_code, amount)
+                    except InsufficientFundsError as e:
+                        print(e)
+                        continue
+                    except ApiRequestError as e:
+                        print(e)
+                        print(
+                            "Повторите попытку позже или проверьте подключение к сети."
+                        )
+                        continue
+                    except CurrencyNotFoundError as e:
+                        print(e)
+                        print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                        continue
                     except ValueError as e:
                         print(e)
                         continue
@@ -151,7 +177,20 @@ def main():
                 else:
                     try:
                         sell_info = sell(current_user, current_code, amount)
-                    except (ValueError, RateUnavailableError) as e:
+                    except InsufficientFundsError as e:
+                        print(e)
+                        continue
+                    except ApiRequestError as e:
+                        print(e)
+                        print(
+                            "Повторите попытку позже или проверьте подключение к сети."
+                        )
+                        continue
+                    except CurrencyNotFoundError as e:
+                        print(e)
+                        print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                        continue
+                    except ValueError as e:
                         print(e)
                         continue
 
@@ -179,7 +218,15 @@ def main():
 
                 try:
                     rate = get_cached_rate(from_currency, to_currency)
-                except (ValueError, RateUnavailableError) as e:
+                except ApiRequestError as e:
+                    print(e)
+                    print("Повторите попытку позже или проверьте подключение к сети.")
+                    continue
+                except CurrencyNotFoundError as e:
+                    print(e)
+                    print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                    continue
+                except ValueError as e:
                     print(e)
                     continue
 
