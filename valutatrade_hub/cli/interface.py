@@ -15,11 +15,13 @@ from valutatrade_hub.core.usecases import (
     register,
     sell,
 )
+from valutatrade_hub.logging_config import setup_logging
 
 
 def main():
     current_user = None
 
+    setup_logging()
     while True:
         user_input = input("Введите команду: ")
 

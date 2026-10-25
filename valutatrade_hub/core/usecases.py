@@ -13,6 +13,7 @@ from valutatrade_hub.core.utils import (
     user_to_dict,
     validate_amount,
 )
+from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 
@@ -189,6 +190,7 @@ def get_portfolio_summary(user: User, base_currency: str = "USD") -> dict:
     return result
 
 
+@log_action(verbose=True)
 def buy(user: User, currency_code: str, amount: float) -> dict:
     """
     Покупает валюту за средства USD-кошелька
@@ -250,6 +252,7 @@ def buy(user: User, currency_code: str, amount: float) -> dict:
     return result
 
 
+@log_action(verbose=True)
 def sell(user: User, currency_code: str, amount: float) -> dict:
     """
     Продаёт валюту с зачислением выручки в USD-кошелёк
