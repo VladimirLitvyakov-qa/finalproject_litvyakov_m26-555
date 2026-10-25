@@ -7,11 +7,11 @@ from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
 
 def load_json(path: str, default: list | dict) -> list | dict:
     """
-    Читает JSON файл и возвращает список словарей
+    Читает данные из JSON-файла
 
     :param path: путь до JSON-файла
     :param default: значение, возвращаемое при отсутствии файла
-    :return: список словарей
+    :return: список или словарь из файла либо переданный default
     :raises ValueError: если файл содержит некорректный JSON
     """
     try:
@@ -163,13 +163,7 @@ def get_rate(from_currency: str, to_currency: str) -> float:
 
 def validate_amount(amount: float) -> None:
     """Валидирует сумму"""
-    if isinstance(amount, bool):
-        raise TypeError(
-            f"amount must be int or float, but got {type(amount).__name__}."
-        )
-
-    if not isinstance(amount, int | float):
-        raise TypeError(f"amount must be int or float, but got {type(amount).__name__}")
+    Wallet.validate_number(amount)
 
     if amount <= 0:
         raise ValueError("'amount' должен быть положительным числом")

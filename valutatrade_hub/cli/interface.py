@@ -2,6 +2,7 @@ import shlex
 from datetime import datetime
 
 from valutatrade_hub.core.usecases import (
+    RateUnavailableError,
     buy,
     get_cached_rate,
     get_portfolio_summary,
@@ -32,9 +33,12 @@ def main():
                 if len(args) != 5 or args[1] != "--username" or args[3] != "--password":
                     print("Некорректный формат. Попробуйте снова.")
                     continue
+                else:
+                    username = args[2]
+                    password = args[4]
 
                 try:
-                    user = register(args[2], args[4])
+                    user = register(username, password)
                 except ValueError as e:
                     print(e)
                     continue
@@ -48,9 +52,12 @@ def main():
                 if len(args) != 5 or args[1] != "--username" or args[3] != "--password":
                     print("Некорректный формат. Попробуйте снова.")
                     continue
+                else:
+                    username = args[2]
+                    password = args[4]
 
                 try:
-                    current_user = login(args[2], args[4])
+                    current_user = login(username, password)
                 except ValueError as e:
                     print(e)
                     continue
@@ -72,11 +79,11 @@ def main():
                 if len(args) == 1:
                     base_currency = "USD"
                 else:
-                    base_currency = args[2]
+                    base_currency = args[2].upper()
 
                 try:
                     portfolio = get_portfolio_summary(current_user, base_currency)
-                except ValueError as e:
+                except (ValueError, RateUnavailableError) as e:
                     print(e)
                     continue
 
@@ -107,7 +114,7 @@ def main():
                     print("Некорректный формат. Попробуйте снова.")
                     continue
                 else:
-                    current_code = args[2]
+                    current_code = args[2].upper()
                     amount = args[4]
 
                 if current_user is None:
@@ -144,7 +151,7 @@ def main():
                 else:
                     try:
                         sell_info = sell(current_user, current_code, amount)
-                    except ValueError as e:
+                    except (ValueError, RateUnavailableError) as e:
                         print(e)
                         continue
 
@@ -172,7 +179,7 @@ def main():
 
                 try:
                     rate = get_cached_rate(from_currency, to_currency)
-                except ValueError as e:
+                except (ValueError, RateUnavailableError) as e:
                     print(e)
                     continue
 

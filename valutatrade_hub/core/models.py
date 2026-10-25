@@ -15,6 +15,22 @@ class Wallet:
         self.currency_code = currency_code
         self.balance = balance
 
+    @staticmethod
+    def validate_number(amount: float) -> None:
+        """Проверяет тип и конечность amount"""
+        if isinstance(amount, bool):
+            raise TypeError(
+                f"amount must be int or float, but got {type(amount).__name__}."
+            )
+
+        if not isinstance(amount, int | float):
+            raise TypeError(
+                f"amount must be int or float, but got {type(amount).__name__}"
+            )
+
+        if not (float("-inf") < amount < float("inf")):
+            raise ValueError("Сумма должна быть конечным числом.")
+
     @property
     def balance(self) -> float:
         """Получить баланс"""
@@ -23,15 +39,7 @@ class Wallet:
     @balance.setter
     def balance(self, amount: float) -> None:
         """Установить баланс"""
-        if isinstance(amount, bool):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}."
-            )
-
-        if not isinstance(amount, int | float):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}"
-            )
+        Wallet.validate_number(amount)
 
         if amount < 0:
             raise ValueError("Баланс не может быть отрицательным.")
@@ -40,15 +48,7 @@ class Wallet:
 
     def deposit(self, amount: float) -> None:
         """Пополнить баланс"""
-        if isinstance(amount, bool):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}."
-            )
-
-        if not isinstance(amount, int | float):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}"
-            )
+        Wallet.validate_number(amount)
 
         if amount <= 0:
             raise ValueError("Сумма пополнения должна быть положительной.")
@@ -57,15 +57,7 @@ class Wallet:
 
     def withdraw(self, amount: float) -> None:
         """Снять с баланса"""
-        if isinstance(amount, bool):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}."
-            )
-
-        if not isinstance(amount, int | float):
-            raise TypeError(
-                f"amount must be int or float, but got {type(amount).__name__}"
-            )
+        Wallet.validate_number(amount)
 
         if amount <= 0:
             raise ValueError("Сумма снятия должна быть положительной.")

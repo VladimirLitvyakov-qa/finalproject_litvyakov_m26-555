@@ -123,6 +123,7 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
         age = datetime.now() - updated_at
 
         if age < timedelta(minutes=5):
+            validate_amount(cache["rate"])
             return cache
 
     try:
@@ -241,7 +242,7 @@ def buy(user: User, currency_code: str, amount: float) -> dict:
 
     try:
         cached_data = get_cached_rate(currency_code, "USD")
-    except ValueError:
+    except (ValueError, RateUnavailableError):
         raise ValueError(f"Не удалось получить курс для {currency_code}→USD")
 
     price = amount * cached_data["rate"]
