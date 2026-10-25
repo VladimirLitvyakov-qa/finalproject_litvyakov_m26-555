@@ -5,19 +5,18 @@ from datetime import datetime, timedelta
 from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User
 from valutatrade_hub.core.utils import (
     get_rate,
-    load_json,
     portfolio_from_dict,
     portfolio_to_dict,
-    save_json,
     user_from_dict,
     user_to_dict,
     validate_amount,
     validate_currency_code,
 )
+from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.infra.settings import SettingsLoader
 
-USERS_PATH = "data/users.json"
-PORTFOLIOS_PATH = "data/portfolios.json"
-RATES_PATH = "data/rates.json"
+db = DatabaseManager()
+settings = SettingsLoader()
 
 
 class RateUnavailableError(Exception):
@@ -32,22 +31,13 @@ def register(username: str, password: str) -> User:
     if len(password) < 4:
         raise ValueError("Пароль должен быть не короче 4 символов.")
 
-    users = load_json(USERS_PATH, [])
-
-    if not isinstance(users, list):
-        raise ValueError("Файл пользователей должен содержать список.")
-
-    portfolios = load_json(PORTFOLIOS_PATH, [])
-
-    if not isinstance(portfolios, list):
-        raise ValueError("Файл портфелей должен содержать список.")
+    users = db.load_users()
+    portfolios = db.load_portfolios()
 
     max_user_id = 0
-
     for user in users:
         if user["username"] == username:
             raise ValueError(f'Имя - "{username}" занято! Попробуйте другое.')
-
         max_user_id = max(max_user_id, user["user_id"])
 
     user_id = max_user_id + 1
@@ -61,22 +51,19 @@ def register(username: str, password: str) -> User:
 
     user = user_to_dict(new_user)
     users.append(user)
-    save_json(USERS_PATH, users)
+    db.save_users(users)
 
     new_portfolio = Portfolio(new_user, {})
     portfolio = portfolio_to_dict(new_portfolio)
     portfolios.append(portfolio)
-    save_json(PORTFOLIOS_PATH, portfolios)
+    db.save_portfolios(portfolios)
 
     return new_user
 
 
 def login(username: str, password: str) -> User:
     """Авторизует пользователя в системе"""
-    users = load_json(USERS_PATH, [])
-
-    if not isinstance(users, list):
-        raise ValueError("Файл пользователей должен содержать список.")
+    users = db.load_users()
 
     for user in users:
         if user["username"] == username:
@@ -108,11 +95,7 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     to_currency = validate_currency_code(to_currency)
     currency_pair = from_currency + "_" + to_currency
 
-    rates = load_json(RATES_PATH, {})
-
-    if not isinstance(rates, dict):
-        raise ValueError("Файл курсов должен содержать словарь.")
-
+    rates = db.load_rates()
     cache = rates.get(currency_pair)
 
     if cache is not None:
@@ -122,7 +105,7 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
         updated_at = datetime.fromisoformat(cache["updated_at"])
         age = datetime.now() - updated_at
 
-        if age < timedelta(minutes=5):
+        if age < timedelta(seconds=settings.get("rates_ttl_seconds")):
             validate_amount(cache["rate"])
             return cache
 
@@ -133,7 +116,7 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
             f"Курс {from_currency}→{to_currency} недоступен. Повторите попытку позже."
         ) from error
     rates[currency_pair] = {"rate": rate, "updated_at": datetime.now().isoformat()}
-    save_json(RATES_PATH, rates)
+    db.save_rates(rates)
 
     return rates[currency_pair]
 
@@ -147,10 +130,7 @@ def get_portfolio(user: User) -> Portfolio:
     :raises ValueError: если JSON некорректен, данные не являются списком
         или портфель пользователя не найден
     """
-    portfolios = load_json(PORTFOLIOS_PATH, [])
-
-    if not isinstance(portfolios, list):
-        raise ValueError("Файл портфелей должен содержать список.")
+    portfolios = db.load_portfolios()
 
     for portfolio in portfolios:
         if portfolio["user_id"] == user.user_id:
@@ -167,15 +147,12 @@ def save_portfolio(portfolio: Portfolio) -> None:
     :raises ValueError: данные не являются списком или
         портфель пользователя не найден
     """
-    portfolios = load_json(PORTFOLIOS_PATH, [])
-
-    if not isinstance(portfolios, list):
-        raise ValueError("Файл портфелей должен содержать список.")
+    portfolios = db.load_portfolios()
 
     for i, data in enumerate(portfolios):
         if data["user_id"] == portfolio.user_id:
             portfolios[i] = portfolio_to_dict(portfolio)
-            save_json(PORTFOLIOS_PATH, portfolios)
+            db.save_portfolios(portfolios)
             break
     else:
         raise ValueError("Портфель пользователя не найден")
