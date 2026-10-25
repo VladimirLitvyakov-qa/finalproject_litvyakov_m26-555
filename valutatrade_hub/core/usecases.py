@@ -20,6 +20,10 @@ PORTFOLIOS_PATH = "data/portfolios.json"
 RATES_PATH = "data/rates.json"
 
 
+class RateUnavailableError(Exception):
+    """Не удалось получить курс из источника."""
+
+
 def register(username: str, password: str) -> User:
     """Регистрирует нового пользователя"""
     if not isinstance(password, str):
@@ -121,7 +125,12 @@ def get_cached_rate(from_currency: str, to_currency: str) -> dict:
         if age < timedelta(minutes=5):
             return cache
 
-    rate = get_rate(from_currency, to_currency)
+    try:
+        rate = get_rate(from_currency, to_currency)
+    except (ConnectionError, TimeoutError) as error:
+        raise RateUnavailableError(
+            f"Курс {from_currency}→{to_currency} недоступен. Повторите попытку позже."
+        ) from error
     rates[currency_pair] = {"rate": rate, "updated_at": datetime.now().isoformat()}
     save_json(RATES_PATH, rates)
 

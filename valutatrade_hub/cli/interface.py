@@ -1,7 +1,9 @@
 import shlex
+from datetime import datetime
 
 from valutatrade_hub.core.usecases import (
     buy,
+    get_cached_rate,
     get_portfolio_summary,
     login,
     register,
@@ -160,6 +162,36 @@ def main():
                         f"{current_code}: было {balance_before} → стало {balance_after}"
                     )
                     print(f"Оценочная выручка: {revenue:.2f} USD ")
+            case "get-rate":
+                if len(args) != 5 or args[1] != "--from" or args[3] != "--to":
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+                else:
+                    from_currency = args[2].upper()
+                    to_currency = args[4].upper()
+
+                try:
+                    rate = get_cached_rate(from_currency, to_currency)
+                except ValueError as e:
+                    print(e)
+                    continue
+
+                exchange_rate = float(rate["rate"])
+                updated_at = datetime.fromisoformat(rate["updated_at"])
+                updated_at_text = updated_at.strftime("%Y-%m-%d %H:%M:%S")
+
+                direct_precision = 8 if to_currency in ("BTC", "ETH") else 2
+                reverse_precision = 8 if from_currency in ("BTC", "ETH") else 2
+
+                print(
+                    f"Курс {from_currency}→{to_currency}: "
+                    f"{exchange_rate:.{direct_precision}f} "
+                    f"(обновлено: {updated_at_text})"
+                )
+                print(
+                    f"Обратный курс {to_currency}→{from_currency}: "
+                    f"{1 / exchange_rate:.{reverse_precision}f}"
+                )
             case "exit":
                 break
             case _:
