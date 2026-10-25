@@ -30,3 +30,13 @@ module-root = ""
 
 [project.scripts]
 valutatrade = "valutatrade_hub.cli.interface:main"
+
+[tool.valutatrade]
+users_path = "data/users.json"
+portfolios_path = "data/portfolios.json"
+rates_path = "data/rates.json"
+rates_ttl_seconds = 300
+default_base_currency = "USD"
+log_path = "logs/actions.log"
+log_level = "INFO"
+log_format = "text"
