@@ -5,6 +5,7 @@ from valutatrade_hub.core.usecases import (
     get_portfolio_summary,
     login,
     register,
+    sell,
 )
 
 
@@ -99,7 +100,7 @@ def main():
 
                 print("-" * 33)
                 print(f"ИТОГО: {portfolio['total']:.{base_precision}f} {base_currency}")
-            case "buy":
+            case "buy" | "sell":
                 if len(args) != 5 or args[1] != "--currency" or args[3] != "--amount":
                     print("Некорректный формат. Попробуйте снова.")
                     continue
@@ -117,24 +118,48 @@ def main():
                     print("Некорректный формат. Попробуйте снова.")
                     continue
 
-                try:
-                    buy_info = buy(current_user, current_code, amount)
-                except ValueError as e:
-                    print(e)
-                    continue
+                if args[0] == "buy":
+                    try:
+                        buy_info = buy(current_user, current_code, amount)
+                    except ValueError as e:
+                        print(e)
+                        continue
 
-                balance_before = buy_info["balance_before"]
-                balance_after = buy_info["balance_after"]
-                rate = buy_info["rate"]
-                price = buy_info["price"]
+                    balance_before = buy_info["balance_before"]
+                    balance_after = buy_info["balance_after"]
+                    rate = buy_info["rate"]
+                    price = buy_info["price"]
 
-                print(
-                    f"Покупка выполнена: {amount} {current_code} "
-                    f"по курсу {rate:.2f} USD/{current_code}"
-                )
-                print("Изменения в портфеле:")
-                print(f"{current_code}: было {balance_before} → стало {balance_after}")
-                print(f"Оценочная стоимость покупки: {price:.2f} USD ")
+                    print(
+                        f"Покупка выполнена: {amount} {current_code} "
+                        f"по курсу {rate:.2f} USD/{current_code}"
+                    )
+                    print("Изменения в портфеле:")
+                    print(
+                        f"{current_code}: было {balance_before} → стало {balance_after}"
+                    )
+                    print(f"Оценочная стоимость покупки: {price:.2f} USD ")
+                else:
+                    try:
+                        sell_info = sell(current_user, current_code, amount)
+                    except ValueError as e:
+                        print(e)
+                        continue
+
+                    balance_before = sell_info["balance_before"]
+                    balance_after = sell_info["balance_after"]
+                    rate = sell_info["rate"]
+                    revenue = sell_info["revenue"]
+
+                    print(
+                        f"Продажа выполнена: {amount} {current_code} "
+                        f"по курсу {rate:.2f} USD/{current_code}"
+                    )
+                    print("Изменения в портфеле:")
+                    print(
+                        f"{current_code}: было {balance_before} → стало {balance_after}"
+                    )
+                    print(f"Оценочная выручка: {revenue:.2f} USD ")
             case "exit":
                 break
             case _:

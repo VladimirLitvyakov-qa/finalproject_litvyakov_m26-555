@@ -268,13 +268,15 @@ def buy(user: User, currency_code: str, amount: float) -> dict:
     return result
 
 
-def sell(user: User, currency_code: str, amount: float) -> None:
+def sell(user: User, currency_code: str, amount: float) -> dict:
     """
     Продаёт валюту с зачислением выручки в USD-кошелёк
 
     :param user: пользователь, совершающий продажу
     :param currency_code: код продаваемой валюты
     :param amount: количество продаваемой валюты
+    :return: словарь с кодом и количеством валюты, балансами до и после продажи,
+        использованным курсом и оценочной выручкой в USD
     :raises TypeError: если пользователь, код валюты или сумма имеют неверный тип
     :raises ValueError: если сумма неположительная, валюта недопустима,
         кошелёк отсутствует, средств недостаточно или данные хранилища некорректны
@@ -292,11 +294,18 @@ def sell(user: User, currency_code: str, amount: float) -> None:
     wallets = portfolio.wallets
 
     if currency_code not in wallets:
-        raise ValueError(f'Кошелёк "{currency_code}" не существует')
+        raise ValueError(
+            f"У вас нет кошелька '{currency_code}'. "
+            f"Добавьте валюту: она создаётся автоматически при первой покупке."
+        )
 
     sell_wallet = wallets[currency_code]
     if sell_wallet.balance < amount:
-        raise ValueError(f'Недостаточно средств в "{currency_code}"')
+        raise ValueError(
+            f"Недостаточно средств: "
+            f"доступно {sell_wallet.balance} {currency_code}, "
+            f"требуется {amount} {currency_code}"
+        )
 
     cached_data = get_cached_rate(currency_code, "USD")
     revenue = amount * cached_data["rate"]
@@ -305,7 +314,20 @@ def sell(user: User, currency_code: str, amount: float) -> None:
         portfolio.add_currency("USD")
 
     usd_wallet = portfolio.get_wallet("USD")
+    balance_before = sell_wallet.balance
     sell_wallet.withdraw(amount)
+    balance_after = sell_wallet.balance
     usd_wallet.deposit(revenue)
 
     save_portfolio(portfolio)
+
+    result = {
+        "currency_code": currency_code,
+        "amount": amount,
+        "balance_before": balance_before,
+        "balance_after": balance_after,
+        "rate": cached_data["rate"],
+        "revenue": revenue,
+    }
+
+    return result
