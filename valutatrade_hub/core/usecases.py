@@ -346,3 +346,20 @@ def sell(user: User, currency_code: str, amount: float) -> dict:
     }
 
     return result
+
+
+def get_rates() -> dict:
+    """Возвращает непустой локальный кеш курсов валют"""
+    cache = db.load_rates()
+    pairs = cache.get("pairs", {})
+
+    if not isinstance(pairs, dict):
+        raise ValueError("Поле 'pairs' в кеше курсов должно содержать словарь.")
+
+    if not pairs:
+        raise ValueError(
+            "Локальный кеш курсов пуст. "
+            "Выполните 'update-rates', чтобы загрузить данные."
+        )
+
+    return cache

@@ -11,16 +11,19 @@ from valutatrade_hub.core.usecases import (
     buy,
     get_cached_rate,
     get_portfolio_summary,
+    get_rates,
     login,
     register,
     sell,
 )
+from valutatrade_hub.core.utils import validate_amount
 from valutatrade_hub.infra.settings import SettingsLoader
 from valutatrade_hub.logging_config import setup_logging
 from valutatrade_hub.parser_service.api_clients import (
     CoinGeckoClient,
     ExchangeRateApiClient,
 )
+from valutatrade_hub.parser_service.config import ParserConfig
 from valutatrade_hub.parser_service.storage import RatesStorage
 from valutatrade_hub.parser_service.updater import RatesUpdater
 
@@ -303,6 +306,134 @@ def main():
                     print(f"Подробности: {settings.get('log_path')}")
                 else:
                     print("Обновление успешно завершено.")
+            case "show-rates":
+                currency = None
+                top = None
+                base_currency = "USD"
+                used_flags = set()
+                valid_args = True
+
+                if len(args) % 2 == 0:
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+
+                for index in range(1, len(args), 2):
+                    flag = args[index]
+                    value = args[index + 1]
+
+                    if flag in used_flags:
+                        print(f"Аргумент {flag} указан повторно.")
+                        valid_args = False
+                        break
+
+                    used_flags.add(flag)
+
+                    if flag == "--currency":
+                        currency = value.upper()
+
+                    elif flag == "--base":
+                        base_currency = value.upper()
+
+                    elif flag == "--top":
+                        try:
+                            top = int(value)
+                        except ValueError:
+                            print("--top должен быть положительным целым числом.")
+                            valid_args = False
+                            break
+
+                        if top <= 0:
+                            print("--top должен быть положительным целым числом.")
+                            valid_args = False
+                            break
+
+                    else:
+                        print(f"Неизвестный аргумент: {flag}")
+                        valid_args = False
+                        break
+
+                if not valid_args:
+                    continue
+
+                try:
+                    cache = get_rates()
+                except ValueError as error:
+                    print(error)
+                    continue
+
+                pairs = cache["pairs"]
+
+                try:
+                    if base_currency == "USD":
+                        base_rate = 1.0
+                    else:
+                        base_record = pairs.get(base_currency + "_USD")
+
+                        if base_record is None:
+                            raise ValueError(
+                                f"Курс для '{base_currency}' не найден в кеше."
+                            )
+
+                        base_rate = base_record["rate"]
+                        validate_amount(base_rate)
+
+                    rows = []
+
+                    for currency_pair, values in pairs.items():
+                        code, quote = currency_pair.split("_", 1)
+
+                        if quote != "USD":
+                            raise ValueError(
+                                f"Ожидалась пара к USD, получена '{currency_pair}'."
+                            )
+
+                        if currency is not None and code != currency:
+                            continue
+
+                        rate = values["rate"]
+                        validate_amount(rate)
+
+                        rows.append(
+                            {
+                                "code": code,
+                                "pair": code + "_" + base_currency,
+                                "rate": rate / base_rate,
+                            }
+                        )
+
+                except (ValueError, TypeError, KeyError) as error:
+                    print(f"Не удалось прочитать курсы: {error}")
+                    continue
+
+                if currency is not None and not rows:
+                    print(f"Курс для '{currency}' не найден в кеше.")
+                    continue
+
+                # --top выбирает только криптовалюты
+                if top is not None:
+                    rows = [
+                        row
+                        for row in rows
+                        if row["code"] in ParserConfig.CRYPTO_CURRENCIES
+                    ]
+                    rows.sort(key=lambda row: row["rate"], reverse=True)
+                    rows = rows[:top]
+                else:
+                    rows.sort(key=lambda row: row["pair"])
+
+                if not rows:
+                    print("Нет курсов, соответствующих указанным фильтрам.")
+                    continue
+
+                print(f"Rates from cache (updated at {cache['last_refresh']}):")
+
+                for row in rows:
+                    rate_text = f"{row['rate']:.8f}".rstrip("0").rstrip(".")
+
+                    if "." not in rate_text:
+                        rate_text += ".00"
+
+                    print(f"- {row['pair']}: {rate_text}")
             case "exit":
                 break
             case _:
