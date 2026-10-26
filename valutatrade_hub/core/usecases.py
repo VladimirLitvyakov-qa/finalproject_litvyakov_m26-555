@@ -1,12 +1,11 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from valutatrade_hub.core.currencies import get_currency
-from valutatrade_hub.core.exceptions import ApiRequestError, InsufficientFundsError
+from valutatrade_hub.core.exceptions import InsufficientFundsError
 from valutatrade_hub.core.models import Portfolio, User
 from valutatrade_hub.core.utils import (
-    get_rate,
     portfolio_from_dict,
     portfolio_to_dict,
     user_from_dict,
@@ -81,43 +80,75 @@ def login(username: str, password: str) -> User:
 
 def get_cached_rate(from_currency: str, to_currency: str) -> dict:
     """
-    Возвращает курс из кеша, обновляя отсутствующие или устаревшие записи
+    Возвращает курс из локального кеша с пересчётом через USD
 
     :param from_currency: код исходной валюты
     :param to_currency: код целевой валюты
-    :return: словарь с курсом и временем его обновления
-    :raises TypeError: если код валюты не является строкой
-    :raises ValueError: если код пустой или данные кеша некорректны
+    :return: словарь с курсом, временем обновления и источником
+    :raises TypeError: если аргументы или значение курса имеют неверный тип
+    :raises ValueError: если данные некорректны, курс отсутствует или устарел
     :raises CurrencyNotFoundError: если код валюты неизвестен
-    :raises ApiRequestError: если произошёл сбой при обращении к источнику курсов
     """
     from_currency = get_currency(from_currency).code
     to_currency = get_currency(to_currency).code
-    currency_pair = from_currency + "_" + to_currency
+    now = datetime.now(timezone.utc)
+
+    if from_currency == to_currency:
+        return {
+            "rate": 1.0,
+            "updated_at": now.isoformat(),
+            "source": "Identity",
+        }
 
     rates = db.load_rates()
-    cache = rates.get(currency_pair)
+    pairs = rates.get("pairs", {})
 
-    if cache is not None:
+    if not isinstance(pairs, dict):
+        raise ValueError("Поле 'pairs' в кеше курсов должно содержать словарь.")
+
+    ttl = timedelta(seconds=settings.get("rates_ttl_seconds"))
+    used_dates = []
+    used_sources = []
+
+    def get_usd_rate(code: str) -> float:
+        if code == "USD":
+            return 1.0
+
+        cache = pairs.get(code + "_USD")
+
+        if cache is None:
+            raise ValueError(
+                f"Курс {code}→USD не найден в кеше. Выполните 'update-rates'."
+            )
+
         if not isinstance(cache, dict):
             raise ValueError("Запись курса должна содержать словарь.")
 
         updated_at = datetime.fromisoformat(cache["updated_at"])
-        age = datetime.now() - updated_at
 
-        if age < timedelta(seconds=settings.get("rates_ttl_seconds")):
-            validate_amount(cache["rate"])
-            return cache
+        if updated_at.tzinfo is None:
+            raise ValueError(
+                "Дата курса должна содержать часовой пояс. Выполните 'update-rates'."
+            )
 
-    try:
-        rate = get_rate(from_currency, to_currency)
-    except (ConnectionError, TimeoutError) as error:
-        raise ApiRequestError(str(error)) from error
+        if now - updated_at >= ttl:
+            raise ValueError(f"Курс {code}→USD устарел. Выполните 'update-rates'.")
 
-    rates[currency_pair] = {"rate": rate, "updated_at": datetime.now().isoformat()}
-    db.save_rates(rates)
+        validate_amount(cache["rate"])
+        used_dates.append(updated_at)
+        used_sources.append(cache["source"])
+        return cache["rate"]
 
-    return rates[currency_pair]
+    from_rate = get_usd_rate(from_currency)
+    to_rate = get_usd_rate(to_currency)
+    exchange_rate = from_rate / to_rate
+    validate_amount(exchange_rate)
+
+    return {
+        "rate": exchange_rate,
+        "updated_at": min(used_dates).isoformat(),
+        "source": ", ".join(dict.fromkeys(used_sources)),
+    }
 
 
 def get_portfolio(user: User) -> Portfolio:
