@@ -121,12 +121,12 @@ def main():
                 username = current_user.username
                 print(f"Портфель пользователя '{username}' (база: {base_currency}):")
 
-                base_precision = 8 if base_currency in ("BTC", "ETH") else 2
+                base_precision = 8 if base_currency in ("BTC", "ETH", "SOL") else 2
                 for wallet in wallets:
                     code = wallet["currency_code"]
                     balance = wallet["balance"]
                     value = wallet["value"]
-                    balance_precision = 8 if code in ("BTC", "ETH") else 2
+                    balance_precision = 8 if code in ("BTC", "ETH", "SOL") else 2
 
                     print(
                         f"- {code}: {balance:.{balance_precision}f} → "
@@ -247,8 +247,8 @@ def main():
                 updated_at = datetime.fromisoformat(rate["updated_at"])
                 updated_at_text = updated_at.strftime("%Y-%m-%d %H:%M:%S")
 
-                direct_precision = 8 if to_currency in ("BTC", "ETH") else 2
-                reverse_precision = 8 if from_currency in ("BTC", "ETH") else 2
+                direct_precision = 8 if to_currency in ("BTC", "ETH", "SOL") else 2
+                reverse_precision = 8 if from_currency in ("BTC", "ETH", "SOL") else 2
 
                 print(
                     f"Курс {from_currency}→{to_currency}: "
@@ -409,7 +409,6 @@ def main():
                     print(f"Курс для '{currency}' не найден в кеше.")
                     continue
 
-                # --top выбирает только криптовалюты
                 if top is not None:
                     rows = [
                         row
