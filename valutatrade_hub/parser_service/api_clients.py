@@ -11,12 +11,16 @@ base_currency = parser_config.BASE_CURRENCY
 
 
 class BaseApiClient(ABC):
+    source: str
+
     @abstractmethod
     def fetch_rates(self) -> dict:
         pass
 
 
 class CoinGeckoClient(BaseApiClient):
+    source = "CoinGecko"
+
     def fetch_rates(self) -> dict:
         """
         Получает курсы фиатных валют из ExchangeRate-API
@@ -58,6 +62,8 @@ class CoinGeckoClient(BaseApiClient):
 
 
 class ExchangeRateApiClient(BaseApiClient):
+    source = "ExchangeRate-API"
+
     def fetch_rates(self) -> dict:
         """
         Получает курсы криптовалют из exchangerate
