@@ -18,9 +18,6 @@ dist/
 .vscode/
 .idea/
 
-# Данные приложения
-data/*.json
-
 # Логи приложения
 logs/
 

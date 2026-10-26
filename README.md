@@ -5,6 +5,10 @@
 курсы из локального кеша. Отдельный сервис парсинга обновляет курсы через
 CoinGecko и ExchangeRate-API.
 
+## Демонстрация
+
+[Посмотреть демонстрацию работы ValutaTrade Hub](https://asciinema.org/a/CpPm057RAcQhP14U)
+
 ## Требования
 
 - Python 3.12 или новее.
