@@ -17,6 +17,12 @@ from valutatrade_hub.core.usecases import (
 )
 from valutatrade_hub.infra.settings import SettingsLoader
 from valutatrade_hub.logging_config import setup_logging
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.storage import RatesStorage
+from valutatrade_hub.parser_service.updater import RatesUpdater
 
 
 def main():
@@ -250,6 +256,53 @@ def main():
                     f"Обратный курс {to_currency}→{from_currency}: "
                     f"{1 / exchange_rate:.{reverse_precision}f}"
                 )
+            case "update-rates":
+                if len(args) not in (1, 3):
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+
+                if len(args) == 3 and args[1] != "--source":
+                    print("Некорректный формат. Попробуйте снова.")
+                    continue
+
+                source = args[2].lower() if len(args) == 3 else None
+
+                if source not in (None, "coingecko", "exchangerate"):
+                    print("Допустимые источники: coingecko, exchangerate.")
+                    continue
+
+                if source == "coingecko":
+                    clients = [CoinGeckoClient()]
+                elif source == "exchangerate":
+                    clients = [ExchangeRateApiClient()]
+                else:
+                    clients = [CoinGeckoClient(), ExchangeRateApiClient()]
+
+                storage = RatesStorage()
+                updater = RatesUpdater(clients, storage)
+
+                try:
+                    result = updater.run_update()
+                except ApiRequestError as error:
+                    print(error)
+                    continue
+
+                updated_at = datetime.fromisoformat(result["last_refresh"])
+                updated_at_text = updated_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+                print(
+                    f"Обновлено курсов: {result['updated_count']}. "
+                    f"Последнее обновление: {updated_at_text}"
+                )
+
+                if result["failed_sources"]:
+                    print("Обновление завершено с ошибками.")
+                    print(
+                        "Не ответили источники: " + ", ".join(result["failed_sources"])
+                    )
+                    print(f"Подробности: {settings.get('log_path')}")
+                else:
+                    print("Обновление успешно завершено.")
             case "exit":
                 break
             case _:
